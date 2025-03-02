@@ -1353,16 +1353,13 @@ class ExportMenu extends GridView
                 $key = $keys[$index];
                 $this->generateRow($model, $key, $this->_endRow);
                 $this->_endRow++;
-                if ($index === $totalCount) {
-                    //a little hack to generate last grouped footer
-                    $this->checkGroupedRow($model, $models[0], $key, $this->_endRow);
-                } elseif (isset($models[$index + 1])) {
-                    $this->checkGroupedRow($model, $models[$index + 1], $key, $this->_endRow);
-                }
+
+                $this->checkGroupedRow($model, $models[$index + 1] ?? [], $key, $this->_endRow);
+
                 if (!is_null($this->_groupedRow)) {
                     $this->_endRow++;
-                    $this->_objWorksheet->fromArray($this->_groupedRow, null, 'A'.($this->_endRow + 1), true);
-                    $cell = 'A'.($this->_endRow + 1).':'.self::columnName(count($columns)).($this->_endRow + 1);
+                    $this->_objWorksheet->fromArray($this->_groupedRow, null, 'A' . ($this->_endRow + 1), true);
+                    $cell = 'A' . ($this->_endRow + 1) . ':' . self::columnName(count($columns)) . ($this->_endRow + 1);
                     $this->_objWorksheet->getStyle($cell)->applyFromArray($this->groupedRowStyle);
                     $this->_groupedRow = null;
                 }
@@ -1377,8 +1374,38 @@ class ExportMenu extends GridView
             }
         }
         $this->generateBox();
-
+        $this->processMergeCells();
         return $this->_endRow;
+    }
+
+    /**
+     * Loop over configured grouped columns and processes merge cells.
+     * 
+     * @throws \PhpOffice\PhpSpreadsheet\Exception
+     */
+    protected function processMergeCells() {
+        $rows = $this->_objWorksheet->getHighestRow();
+
+        foreach ($this->_groupedColumn as $colIndex => $group) {
+            if (!is_array($group)) {
+                continue;
+            }
+            
+            $column = self::columnName($colIndex + 1);
+            $lastValue = $this->_objWorksheet->getCell($column . $startRow)->getValue();
+    
+            for ($row = 2; $row <= $rows + 1; $row++) {
+                $value = ($row <= $rows) ? $this->_objWorksheet->getCell($column. $row)->getValue() : null;
+    
+                if ($value !== $lastValue) {
+                    if ($row - $startRow > 1) {
+                        $this->_objWorksheet->mergeCells($column . $startRow . ":" . $column . ($row - 1));
+                    }
+                    $startRow = $row;
+                    $lastValue = $value;
+                }
+            }
+        }
     }
 
     /**
@@ -2107,13 +2134,10 @@ class ExportMenu extends GridView
         $endLine = $this->_endRow + 1;
         list($endLine, $firstLine) = ($endLine > $firstLine) ? [$endLine, $firstLine] : [$firstLine, $endLine];
         foreach ($this->getVisibleColumns() as $key => $column) {
+
             $value = $groupFooter[$key] ?? '';
-            //$endGroupedCol++;
             $groupedRange = self::columnName($key + 1).$firstLine.':'.self::columnName($key + 1).$endLine;
-            //$lastCell = self::columnName($key + 1) . $endLine - 1;
-            if (isset($column->group) && $column->group) {
-                $this->_objWorksheet->mergeCells($groupedRange);
-            }
+
             switch ($value) {
                 case self::F_SUM:
                     $value = "=SUM($groupedRange)";
