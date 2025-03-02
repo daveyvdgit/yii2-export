@@ -1385,17 +1385,19 @@ class ExportMenu extends GridView
      */
     protected function processMergeCells() {
         $rows = $this->_objWorksheet->getHighestRow();
-
+    
         foreach ($this->_groupedColumn as $colIndex => $group) {
             if (!is_array($group)) {
                 continue;
             }
             
             $column = self::columnName($colIndex + 1);
+            $startRow = 2;
             $lastValue = $this->_objWorksheet->getCell($column . $startRow)->getValue();
-    
-            for ($row = 2; $row <= $rows + 1; $row++) {
-                $value = ($row <= $rows) ? $this->_objWorksheet->getCell($column. $row)->getValue() : null;
+            
+            // Add one additional row to correctly close the sheet on last column
+            for ($row = $startRow; $row <= $rows + 1; $row++) {
+                $value = ($row <= $rows) ? $this->_objWorksheet->getCell($column . $row)->getValue() : null;
     
                 if ($value !== $lastValue) {
                     if ($row - $startRow > 1) {
